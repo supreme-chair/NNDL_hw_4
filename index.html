@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>MNIST CNN with TensorFlow.js</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-vis@latest"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { display: flex; gap: 20px; }
+        .left-column, .right-column { flex: 1; }
+        .preview-row { display: flex; gap: 10px; margin: 10px 0; }
+        .preview-item { text-align: center; }
+        canvas { border: 1px solid #ccc; image-rendering: pixelated; }
+        .correct { color: green; font-weight: bold; }
+        .wrong { color: red; font-weight: bold; }
+        button { margin: 5px; padding: 8px 12px; }
+        .file-inputs { margin: 10px 0; }
+        .status { background: #f0f0f0; padding: 10px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h1>MNIST CNN Training (Client-Side)</h1>
+    
+    <div class="file-inputs">
+        <label>Upload Train CSV: <input type="file" id="trainFile" accept=".csv"></label>
+        <label>Upload Test CSV: <input type="file" id="testFile" accept=".csv"></label>
+        <button id="loadDataBtn">Load Data</button>
+    </div>
+
+    <div class="container">
+        <div class="left-column">
+            <h2>Controls</h2>
+            <div>
+                <button id="trainBtn">Train</button>
+                <button id="evaluateBtn">Evaluate</button>
+                <button id="testFiveBtn">Test 5 Random</button>
+                <button id="saveModelBtn">Save Model</button>
+                <button id="resetBtn">Reset</button>
+                <button id="toggleVisorBtn">Toggle Visor</button>
+            </div>
+            
+            <div>
+                <label>Load Model JSON: <input type="file" id="modelJsonFile" accept=".json"></label>
+                <label>Load Model Weights: <input type="file" id="modelWeightsFile" accept=".bin"></label>
+                <button id="loadModelBtn">Load Model</button>
+            </div>
+
+            <div id="dataStatus" class="status">
+                <h3>Data Status</h3>
+                <p>No data loaded</p>
+            </div>
+
+            <div id="modelInfo" class="status">
+                <h3>Model Info</h3>
+                <p>No model loaded</p>
+            </div>
+        </div>
+
+        <div class="right-column">
+            <h2>Training Logs</h2>
+            <div id="trainingLogs"></div>
+            
+            <h2>Random 5 Preview</h2>
+            <div id="previewContainer" class="preview-row"></div>
+        </div>
+    </div>
+
+    <script src="data-loader.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
