@@ -230,8 +230,8 @@ async onTestFive(){
 
         this.dataLoader.draw28x28ToCanvas(tf.tensor(original[i]),c1,4);
         this.dataLoader.draw28x28ToCanvas(tf.tensor(noisyArr[i]),c2,4);
-        this.dataLoader.draw28x28ToCanvas(tf.tensor(maxArr[i]),c3,4);
-        this.dataLoader.draw28x28ToCanvas(tf.tensor(avgArr[i]),c4,4);
+        this.dataLoader.draw28x28ToCanvas(tf.tensor(maxArr[i]).squeeze(),c3,4);
+        this.dataLoader.draw28x28ToCanvas(tf.tensor(avgArr[i]).squeeze(),c4,4);
 
         row.appendChild(c1);
         row.appendChild(c2);
