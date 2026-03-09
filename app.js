@@ -76,14 +76,15 @@ class MNISTApp {
 
             // Train with tfjs-vis callbacks
             const startTime = Date.now();
-            const history = await this.model.fit(trainXs, trainYs, {
+            const noisyTrain = addNoise(trainXs);
+            const history = await this.model.fit(noisyTrain, trainXs, {
                 epochs: 5,
                 batchSize: 128,
                 validationData: [valXs, valYs],
                 shuffle: true,
                 callbacks: tfvis.show.fitCallbacks(
                     { name: 'Training Performance' },
-                    ['loss', 'val_loss', 'acc', 'val_acc'],
+                    ['loss', 'val_loss'],
                     { callbacks: ['onEpochEnd'] }
                 )
             });
@@ -163,35 +164,52 @@ class MNISTApp {
     }
 
     async onTestFive() {
-        if (!this.model || !this.testData) {
-            this.showError('Please load both model and test data first');
-            return;
-        }
+            if (!this.model || !this.testData) {
+                this.showError('Please load model and test data first');
+                return;
+            }
 
-        try {
-            const { batchXs, batchYs, indices } = this.dataLoader.getRandomTestBatch(
-                this.testData.xs, this.testData.ys, 5
+            const container = document.getElementById('previewContainer');
+            container.innerHTML = '';
+
+            const { batchXs } = this.dataLoader.getRandomTestBatch(
+                this.testData.xs,
+                this.testData.ys,
+                5
             );
-            
-            const predictions = this.model.predict(batchXs);
-            const predictedLabels = predictions.argMax(-1);
-            const trueLabels = batchYs.argMax(-1);
-            
-            const predArray = await predictedLabels.array();
-            const trueArray = await trueLabels.array();
-            
-            this.renderPreview(batchXs, predArray, trueArray, indices);
-            
-            // Clean up
-            predictions.dispose();
-            predictedLabels.dispose();
-            trueLabels.dispose();
+
+            const noisy = addNoise(batchXs);
+
+            const denoised = this.model.predict(noisy);
+
+            const original = batchXs.arraySync();
+            const noisyArr = noisy.arraySync();
+            const denoisedArr = denoised.arraySync();
+
+            for(let i=0;i<5;i++){
+
+                const row = document.createElement('div');
+                row.style.display = "flex";
+                row.style.gap = "20px";
+
+                const canvas1 = document.createElement('canvas');
+                const canvas2 = document.createElement('canvas');
+                const canvas3 = document.createElement('canvas');
+
+                this.dataLoader.draw28x28ToCanvas(tf.tensor(original[i]), canvas1, 4);
+                this.dataLoader.draw28x28ToCanvas(tf.tensor(noisyArr[i]), canvas2, 4);
+                this.dataLoader.draw28x28ToCanvas(tf.tensor(denoisedArr[i]), canvas3, 4);
+
+                row.appendChild(canvas1);
+                row.appendChild(canvas2);
+                row.appendChild(canvas3);
+
+                container.appendChild(row);
+            }
+
             batchXs.dispose();
-            batchYs.dispose();
-            
-        } catch (error) {
-            this.showError(`Test preview failed: ${error.message}`);
-        }
+            noisy.dispose();
+            denoised.dispose();
     }
 
     async onSaveDownload() {
@@ -258,38 +276,62 @@ class MNISTApp {
     }
 
     createModel() {
-        const model = tf.sequential();
-        
-        model.add(tf.layers.conv2d({
-            filters: 32,
-            kernelSize: 3,
-            activation: 'relu',
-            padding: 'same',
-            inputShape: [28, 28, 1]
-        }));
-        
-        model.add(tf.layers.conv2d({
-            filters: 64,
-            kernelSize: 3,
-            activation: 'relu',
-            padding: 'same'
-        }));
-        
-        model.add(tf.layers.maxPooling2d({ poolSize: 2 }));
-        model.add(tf.layers.dropout({ rate: 0.25 }));
-        model.add(tf.layers.flatten());
-        
-        model.add(tf.layers.dense({ units: 128, activation: 'relu' }));
-        model.add(tf.layers.dropout({ rate: 0.5 }));
-        model.add(tf.layers.dense({ units: 10, activation: 'softmax' }));
-        
-        model.compile({
-            optimizer: 'adam',
-            loss: 'categoricalCrossentropy',
-            metrics: ['accuracy']
-        });
-        
-        return model;
+            const input = tf.input({shape:[28,28,1]});
+
+    // Encoder
+            let x = tf.layers.conv2d({
+                filters:32,
+                kernelSize:3,
+                activation:'relu',
+                padding:'same'
+            }).apply(input);
+
+            x = tf.layers.maxPooling2d({poolSize:2}).apply(x);
+
+            x = tf.layers.conv2d({
+                filters:16,
+                kernelSize:3,
+                activation:'relu',
+                padding:'same'
+            }).apply(x);
+
+            x = tf.layers.maxPooling2d({poolSize:2}).apply(x);
+
+        // Decoder
+            x = tf.layers.conv2dTranspose({
+                filters:16,
+                kernelSize:3,
+                strides:2,
+                activation:'relu',
+                padding:'same'
+            }).apply(x);
+
+            x = tf.layers.conv2dTranspose({
+                filters:32,
+                kernelSize:3,
+                strides:2,
+                activation:'relu',
+                padding:'same'
+            }).apply(x);
+
+            const output = tf.layers.conv2d({
+                filters:1,
+                kernelSize:3,
+                activation:'sigmoid',
+                padding:'same'
+            }).apply(x);
+
+            const model = tf.model({
+                inputs:input,
+                outputs:output
+            });
+
+            model.compile({
+                optimizer:'adam',
+                loss:'binaryCrossentropy'
+            });
+
+            return model;
     }
 
     async calculateAccuracy(predicted, trueLabels) {
@@ -399,7 +441,13 @@ class MNISTApp {
         console.error(message);
     }
 }
-
+function addNoise(images, noiseFactor = 0.5) {
+    return tf.tidy(() => {
+        const noise = tf.randomNormal(images.shape);
+        const noisy = images.add(noise.mul(noiseFactor));
+        return noisy.clipByValue(0, 1);
+    });
+}
 // Initialize app when page loads
 document.addEventListener('DOMContentLoaded', () => {
     new MNISTApp();
