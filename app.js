@@ -103,7 +103,7 @@ createAutoencoder(poolType) {
 
     model.compile({
         optimizer:'adam',
-        loss:'binaryCrossentropy'
+        loss:'meanSquaredError'
     });
 
     return model;
@@ -137,7 +137,7 @@ async onTrain() {
     this.showStatus("Training MAX pooling model...");
 
     await this.modelMax.fit(noisyTrain, trainXs,{
-        epochs:5,
+        epochs:2,
         batchSize:128,
         validationData:[noisyVal,valXs],
         callbacks: tfvis.show.fitCallbacks(
@@ -340,7 +340,7 @@ showError(msg){
 
 }
 
-function addNoise(images, noiseFactor=0.5){
+function addNoise(images, noiseFactor=0.2){
 
 return tf.tidy(()=>{
     const noise=tf.randomNormal(images.shape);
