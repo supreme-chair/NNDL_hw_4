@@ -251,8 +251,8 @@ class MNISTApp {
             const startTime = Date.now();
         
             await this.denoiserModel.fit(trainNoisy, trainClean, {
-                epochs: 20,
-                batchSize: 32,
+                epochs: 30,
+                batchSize: 64,
                 validationData: [valNoisy, valClean],
                 callbacks: {
                     onEpochEnd: (epoch, logs) => {
@@ -473,16 +473,16 @@ class MNISTApp {
             // 3. Max Pooling модель
             const maxPoolModel = this.createDenoiserWithPooling('max');
             await maxPoolModel.fit(trainNoisy.reshape([500, 784]), trainOriginal.reshape([500, 784]), {
-                epochs: 20,
-                batchSize: 32,
+                epochs: 30,
+                batchSize: 64,
                 verbose: 0
             });
             
             // 4. Average Pooling модель
             const avgPoolModel = this.createDenoiserWithPooling('avg');
             await avgPoolModel.fit(trainNoisy.reshape([500, 784]), trainOriginal.reshape([500, 784]), {
-                epochs: 20,
-                batchSize: 32,
+                epochs: 30,
+                batchSize: 64,
                 verbose: 0
             });
             
