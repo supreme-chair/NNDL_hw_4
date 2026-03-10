@@ -472,17 +472,7 @@ class MNISTApp {
         return div;
     }
 
-    
 
-    async onSaveDenoiser() {
-        if (!this.denoiserModel) return;
-        try {
-            await this.denoiserModel.save('downloads://mnist-denoiser');
-            this.showStatus('Denoiser saved');
-        } catch (error) {
-            this.showError('Save failed');
-        }
-    }
 
     async onLoadFromFiles() {
         const jsonFile = document.getElementById('modelJsonFile').files[0];
