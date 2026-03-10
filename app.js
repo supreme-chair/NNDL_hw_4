@@ -7,20 +7,17 @@ class MNISTApp {
         this.trainData = null;
         this.testData = null;
         
-        // Принудительно используем CPU
         this.initBackend();
         this.initializeUI();
     }
 
     async initBackend() {
         try {
-            // Явно устанавливаем CPU бэкенд
             await tf.setBackend('cpu');
             console.log('Using CPU backend');
             this.showStatus('Using CPU backend for stability');
         } catch (error) {
             console.error('Failed to set backend:', error);
-            this.showError('Failed to initialize TensorFlow.js');
         }
     }
 
@@ -37,8 +34,6 @@ class MNISTApp {
         document.getElementById('loadDenoiserBtn').addEventListener('click', () => this.onLoadDenoiserFromFiles());
         document.getElementById('resetBtn').addEventListener('click', () => this.onReset());
         document.getElementById('toggleVisorBtn').addEventListener('click', () => this.toggleVisor());
-        
-        // Убираем выбор pooling type для простоты
     }
 
     async onLoadData() {
@@ -83,30 +78,31 @@ class MNISTApp {
             this.isTraining = true;
             this.showStatus('Starting training...');
             
-            // Используем очень маленькое подмножество данных для теста
-            const numSamples = Math.min(1000, this.trainData.xs.shape[0]);
-            const subsetXs = this.trainData.xs.slice([0, 0, 0, 0], [numSamples, 28, 28, 1]);
-            const subsetYs = this.trainData.ys.slice([0, 0], [numSamples, 10]);
+            // Используем подмножество данных
+            const numSamples = Math.min(2000, this.trainData.xs.shape[0]);
             
-            const splitIndex = Math.floor(numSamples * 0.9);
+            // Нормализуем данные правильно
+            const xs = this.trainData.xs.slice([0, 0, 0, 0], [numSamples, 28, 28, 1]);
+            const ys = this.trainData.ys.slice([0, 0], [numSamples, 10]);
             
-            const trainXs = subsetXs.slice([0, 0, 0, 0], [splitIndex, 28, 28, 1]);
-            const trainYs = subsetYs.slice([0, 0], [splitIndex, 10]);
+            const splitIndex = Math.floor(numSamples * 0.8);
             
-            const valXs = subsetXs.slice([splitIndex, 0, 0, 0], [numSamples - splitIndex, 28, 28, 1]);
-            const valYs = subsetYs.slice([splitIndex, 0], [numSamples - splitIndex, 10]);
+            const trainXs = xs.slice([0, 0, 0, 0], [splitIndex, 28, 28, 1]);
+            const trainYs = ys.slice([0, 0], [splitIndex, 10]);
+            
+            const valXs = xs.slice([splitIndex, 0, 0, 0], [numSamples - splitIndex, 28, 28, 1]);
+            const valYs = ys.slice([splitIndex, 0], [numSamples - splitIndex, 10]);
 
             if (!this.model) {
-                this.model = this.createSimpleClassifier();
+                this.model = this.createClassifier();
                 this.updateModelInfo();
             }
 
             const startTime = Date.now();
             
-            // Обучаем без визуализации для экономии памяти
             await this.model.fit(trainXs, trainYs, {
-                epochs: 2,
-                batchSize: 32,
+                epochs: 5,
+                batchSize: 64,
                 validationData: [valXs, valYs],
                 callbacks: {
                     onEpochEnd: (epoch, logs) => {
@@ -118,8 +114,7 @@ class MNISTApp {
             const duration = (Date.now() - startTime) / 1000;
             this.showStatus(`Training completed in ${duration.toFixed(1)}s`);
             
-            // Очищаем память
-            tf.dispose([subsetXs, subsetYs, trainXs, trainYs, valXs, valYs]);
+            tf.dispose([xs, ys, trainXs, trainYs, valXs, valYs]);
             
         } catch (error) {
             this.showError(`Training failed: ${error.message}`);
@@ -129,16 +124,30 @@ class MNISTApp {
         }
     }
 
-    createSimpleClassifier() {
-        // Максимально простая модель
+    createClassifier() {
         const model = tf.sequential();
         
-        model.add(tf.layers.flatten({
+        // Конволюционные слои для лучшего обучения
+        model.add(tf.layers.conv2d({
+            filters: 16,
+            kernelSize: 3,
+            activation: 'relu',
             inputShape: [28, 28, 1]
         }));
         
+        model.add(tf.layers.maxPooling2d({ poolSize: 2 }));
+        
+        model.add(tf.layers.conv2d({
+            filters: 32,
+            kernelSize: 3,
+            activation: 'relu'
+        }));
+        
+        model.add(tf.layers.maxPooling2d({ poolSize: 2 }));
+        model.add(tf.layers.flatten());
+        
         model.add(tf.layers.dense({
-            units: 128,
+            units: 64,
             activation: 'relu'
         }));
         
@@ -148,7 +157,7 @@ class MNISTApp {
         }));
         
         model.compile({
-            optimizer: 'adam',
+            optimizer: tf.train.adam(0.001),
             loss: 'categoricalCrossentropy',
             metrics: ['accuracy']
         });
@@ -171,32 +180,38 @@ class MNISTApp {
             this.isTraining = true;
             this.showStatus('Starting denoiser training...');
             
-            // Используем очень маленькое подмножество
-            const numSamples = Math.min(500, this.trainData.xs.shape[0]);
-            const subsetXs = this.trainData.xs.slice([0, 0, 0, 0], [numSamples, 28, 28, 1]);
+            // Используем подмножество
+            const numSamples = Math.min(1000, this.trainData.xs.shape[0]);
             
-            // Создаем зашумленные данные
+            // Берем чистые изображения
+            const cleanImages = this.trainData.xs.slice([0, 0, 0, 0], [numSamples, 28, 28, 1]);
+            
+            // Создаем зашумленные версии
             const noise = tf.randomNormal([numSamples, 28, 28, 1], 0, 0.2);
-            const noisyXs = subsetXs.add(noise).clipByValue(0, 1);
+            const noisyImages = cleanImages.add(noise).clipByValue(0, 1);
             
-            const splitIndex = Math.floor(numSamples * 0.9);
+            // Преобразуем в плоские векторы для dense слоев
+            const cleanFlat = cleanImages.reshape([numSamples, 784]);
+            const noisyFlat = noisyImages.reshape([numSamples, 784]);
             
-            const trainNoisy = noisyXs.slice([0, 0, 0, 0], [splitIndex, 28, 28, 1]);
-            const trainClean = subsetXs.slice([0, 0, 0, 0], [splitIndex, 28, 28, 1]);
+            const splitIndex = Math.floor(numSamples * 0.8);
             
-            const valNoisy = noisyXs.slice([splitIndex, 0, 0, 0], [numSamples - splitIndex, 28, 28, 1]);
-            const valClean = subsetXs.slice([splitIndex, 0, 0, 0], [numSamples - splitIndex, 28, 28, 1]);
+            const trainNoisy = noisyFlat.slice([0, 0], [splitIndex, 784]);
+            const trainClean = cleanFlat.slice([0, 0], [splitIndex, 784]);
+            
+            const valNoisy = noisyFlat.slice([splitIndex, 0], [numSamples - splitIndex, 784]);
+            const valClean = cleanFlat.slice([splitIndex, 0], [numSamples - splitIndex, 784]);
 
             if (!this.denoiserModel) {
-                this.denoiserModel = this.createSimpleDenoiser();
+                this.denoiserModel = this.createDenoiser();
                 this.updateModelInfo();
             }
 
             const startTime = Date.now();
             
             await this.denoiserModel.fit(trainNoisy, trainClean, {
-                epochs: 3,
-                batchSize: 32,
+                epochs: 10,
+                batchSize: 64,
                 validationData: [valNoisy, valClean],
                 callbacks: {
                     onEpochEnd: (epoch, logs) => {
@@ -208,8 +223,8 @@ class MNISTApp {
             const duration = (Date.now() - startTime) / 1000;
             this.showStatus(`Denoiser training completed in ${duration.toFixed(1)}s`);
             
-            // Очищаем память
-            tf.dispose([subsetXs, noise, noisyXs, trainNoisy, trainClean, valNoisy, valClean]);
+            tf.dispose([cleanImages, noise, noisyImages, cleanFlat, noisyFlat, 
+                       trainNoisy, trainClean, valNoisy, valClean]);
             
         } catch (error) {
             this.showError(`Denoiser training failed: ${error.message}`);
@@ -219,25 +234,45 @@ class MNISTApp {
         }
     }
 
-    createSimpleDenoiser() {
-        // Простой автоэнкодер
+    createDenoiser() {
         const model = tf.sequential();
         
         // Encoder
         model.add(tf.layers.dense({
-            units: 128,
+            units: 256,
             activation: 'relu',
             inputShape: [784]
         }));
         
+        model.add(tf.layers.dense({
+            units: 128,
+            activation: 'relu'
+        }));
+        
+        // Bottleneck
+        model.add(tf.layers.dense({
+            units: 64,
+            activation: 'relu'
+        }));
+        
         // Decoder
+        model.add(tf.layers.dense({
+            units: 128,
+            activation: 'relu'
+        }));
+        
+        model.add(tf.layers.dense({
+            units: 256,
+            activation: 'relu'
+        }));
+        
         model.add(tf.layers.dense({
             units: 784,
             activation: 'sigmoid'
         }));
         
         model.compile({
-            optimizer: 'adam',
+            optimizer: tf.train.adam(0.001),
             loss: 'meanSquaredError'
         });
         
@@ -253,12 +288,11 @@ class MNISTApp {
         try {
             this.showStatus('Evaluating...');
             
-            // Используем маленькое подмножество
-            const numTest = Math.min(200, this.testData.xs.shape[0]);
+            const numTest = Math.min(500, this.testData.xs.shape[0]);
             const testXs = this.testData.xs.slice([0, 0, 0, 0], [numTest, 28, 28, 1]);
             const testYs = this.testData.ys.slice([0, 0], [numTest, 10]);
             
-            const result = this.model.evaluate(testXs, testYs);
+            const result = this.model.evaluate(testXs, testYs, { batchSize: 64 });
             const loss = result[0].dataSync()[0];
             const acc = result[1].dataSync()[0];
             
@@ -278,24 +312,58 @@ class MNISTApp {
         }
 
         try {
+            // Выбираем 5 случайных индексов
             const indices = [];
             for (let i = 0; i < 5; i++) {
                 indices.push(Math.floor(Math.random() * this.testData.xs.shape[0]));
             }
             
-            const batchXs = tf.gather(this.testData.xs, indices);
-            const batchYs = tf.gather(this.testData.ys, indices);
+            const testXs = tf.gather(this.testData.xs, indices);
+            const testYs = tf.gather(this.testData.ys, indices);
             
-            const predictions = this.model.predict(batchXs);
+            const predictions = this.model.predict(testXs);
             const predLabels = predictions.argMax(-1);
-            const trueLabels = batchYs.argMax(-1);
+            const trueLabels = testYs.argMax(-1);
             
             const predArray = await predLabels.array();
             const trueArray = await trueLabels.array();
             
-            this.renderSimplePreview(batchXs, predArray, trueArray);
+            // Очищаем предыдущий preview
+            const container = document.getElementById('previewContainer');
+            container.innerHTML = '';
             
-            tf.dispose([batchXs, batchYs, predictions, predLabels, trueLabels]);
+            // Отображаем изображения
+            for (let i = 0; i < 5; i++) {
+                const canvas = document.createElement('canvas');
+                canvas.width = 56;
+                canvas.height = 56;
+                canvas.style.margin = '5px';
+                canvas.style.border = '1px solid #ccc';
+                
+                const imgTensor = testXs.slice([i, 0, 0, 0], [1, 28, 28, 1]).reshape([28, 28]);
+                const imgData = await this.tensorToImageData(imgTensor);
+                
+                const ctx = canvas.getContext('2d');
+                ctx.putImageData(imgData, 0, 0);
+                
+                const div = document.createElement('div');
+                div.style.display = 'inline-block';
+                div.style.textAlign = 'center';
+                div.appendChild(canvas);
+                
+                const label = document.createElement('div');
+                const isCorrect = predArray[i] === trueArray[i];
+                label.style.color = isCorrect ? 'green' : 'red';
+                label.style.fontWeight = 'bold';
+                label.textContent = `P:${predArray[i]} T:${trueArray[i]}`;
+                div.appendChild(label);
+                
+                container.appendChild(div);
+                
+                imgTensor.dispose();
+            }
+            
+            tf.dispose([testXs, testYs, predictions, predLabels, trueLabels]);
             
         } catch (error) {
             this.showError(`Test preview failed: ${error.message}`);
@@ -311,6 +379,7 @@ class MNISTApp {
         try {
             this.showStatus('Testing denoiser...');
             
+            // Выбираем 3 случайных индекса
             const indices = [];
             for (let i = 0; i < 3; i++) {
                 indices.push(Math.floor(Math.random() * this.testData.xs.shape[0]));
@@ -322,12 +391,35 @@ class MNISTApp {
             const noise = tf.randomNormal([3, 28, 28, 1], 0, 0.3);
             const noisy = original.add(noise).clipByValue(0, 1);
             
-            // Для денойзера нужно преобразовать в вектор
+            // Денойзинг
             const noisyFlat = noisy.reshape([3, 784]);
             const denoisedFlat = this.denoiserModel.predict(noisyFlat);
             const denoised = denoisedFlat.reshape([3, 28, 28, 1]);
             
-            this.renderDenoisePreview(noisy, denoised, original);
+            // Отображаем результаты
+            const container = document.getElementById('previewContainer');
+            container.innerHTML = '<h3>Denoising Results (Noisy → Denoised → Original)</h3>';
+            
+            for (let i = 0; i < 3; i++) {
+                const row = document.createElement('div');
+                row.style.display = 'flex';
+                row.style.justifyContent = 'center';
+                row.style.marginBottom = '20px';
+                
+                // Noisy
+                const noisyCanvas = await this.createImageCanvas(noisy.slice([i, 0, 0, 0], [1, 28, 28, 1]));
+                row.appendChild(noisyCanvas);
+                
+                // Denoised
+                const denoisedCanvas = await this.createImageCanvas(denoised.slice([i, 0, 0, 0], [1, 28, 28, 1]));
+                row.appendChild(denoisedCanvas);
+                
+                // Original
+                const originalCanvas = await this.createImageCanvas(original.slice([i, 0, 0, 0], [1, 28, 28, 1]));
+                row.appendChild(originalCanvas);
+                
+                container.appendChild(row);
+            }
             
             tf.dispose([original, noise, noisy, noisyFlat, denoisedFlat, denoised]);
             
@@ -336,101 +428,60 @@ class MNISTApp {
         }
     }
 
-    renderSimplePreview(images, predictions, trueLabels) {
-        const container = document.getElementById('previewContainer');
-        container.innerHTML = '';
+    async createImageCanvas(tensor) {
+        const canvas = document.createElement('canvas');
+        canvas.width = 84;
+        canvas.height = 84;
+        canvas.style.margin = '5px';
+        canvas.style.border = '1px solid #ccc';
         
-        for (let i = 0; i < 5; i++) {
-            const canvas = document.createElement('canvas');
-            canvas.width = 56;
-            canvas.height = 56;
-            canvas.style.margin = '5px';
-            
-            const tensor = images.slice([i, 0, 0, 0], [1, 28, 28, 1]).reshape([28, 28]);
-            const data = tensor.mul(255).dataSync();
-            
-            const ctx = canvas.getContext('2d');
-            const imgData = ctx.createImageData(28, 28);
-            
-            for (let j = 0; j < 784; j++) {
-                imgData.data[j * 4] = data[j];
-                imgData.data[j * 4 + 1] = data[j];
-                imgData.data[j * 4 + 2] = data[j];
-                imgData.data[j * 4 + 3] = 255;
-            }
-            
-            ctx.putImageData(imgData, 0, 0);
-            
-            const div = document.createElement('div');
-            div.style.display = 'inline-block';
-            div.style.textAlign = 'center';
-            div.appendChild(canvas);
-            
-            const label = document.createElement('div');
-            const isCorrect = predictions[i] === trueLabels[i];
-            label.style.color = isCorrect ? 'green' : 'red';
-            label.textContent = `P:${predictions[i]} T:${trueLabels[i]}`;
-            div.appendChild(label);
-            
-            container.appendChild(div);
-            
-            tensor.dispose();
-        }
+        const imgTensor = tensor.reshape([28, 28]);
+        const imgData = await this.tensorToImageData(imgTensor);
+        
+        const ctx = canvas.getContext('2d');
+        ctx.putImageData(imgData, 0, 0);
+        
+        imgTensor.dispose();
+        return canvas;
     }
 
-    renderDenoisePreview(noisy, denoised, original) {
-        const container = document.getElementById('previewContainer');
-        container.innerHTML = '<h3>Denoising Results (Left: Noisy, Middle: Denoised, Right: Original)</h3>';
-        
-        for (let i = 0; i < 3; i++) {
-            const row = document.createElement('div');
-            row.style.display = 'flex';
-            row.style.justifyContent = 'center';
-            row.style.marginBottom = '10px';
+    async tensorToImageData(tensor) {
+        return tf.tidy(() => {
+            const data = tensor.mul(255).dataSync();
+            const imgData = new ImageData(28, 28);
             
-            [noisy, denoised, original].forEach((tensor, idx) => {
-                const canvas = document.createElement('canvas');
-                canvas.width = 56;
-                canvas.height = 56;
-                canvas.style.margin = '5px';
-                
-                const imgTensor = tensor.slice([i, 0, 0, 0], [1, 28, 28, 1]).reshape([28, 28]);
-                const data = imgTensor.mul(255).dataSync();
-                
-                const ctx = canvas.getContext('2d');
-                const imgData = ctx.createImageData(28, 28);
-                
-                for (let j = 0; j < 784; j++) {
-                    imgData.data[j * 4] = data[j];
-                    imgData.data[j * 4 + 1] = data[j];
-                    imgData.data[j * 4 + 2] = data[j];
-                    imgData.data[j * 4 + 3] = 255;
-                }
-                
-                ctx.putImageData(imgData, 0, 0);
-                row.appendChild(canvas);
-                
-                imgTensor.dispose();
-            });
+            for (let i = 0; i < 784; i++) {
+                const val = data[i];
+                imgData.data[i * 4] = val;
+                imgData.data[i * 4 + 1] = val;
+                imgData.data[i * 4 + 2] = val;
+                imgData.data[i * 4 + 3] = 255;
+            }
             
-            container.appendChild(row);
-        }
+            return imgData;
+        });
     }
 
     async onSaveDownload() {
-        if (!this.model) return;
+        if (!this.model) {
+            this.showError('No model to save');
+            return;
+        }
         try {
-            await this.model.save('downloads://mnist-model');
-            this.showStatus('Model saved');
+            await this.model.save('downloads://mnist-classifier');
+            this.showStatus('Classifier saved');
         } catch (error) {
             this.showError('Save failed');
         }
     }
 
     async onSaveDenoiser() {
-        if (!this.denoiserModel) return;
+        if (!this.denoiserModel) {
+            this.showError('No denoiser to save');
+            return;
+        }
         try {
-            await this.denoiserModel.save('downloads://denoiser-model');
+            await this.denoiserModel.save('downloads://mnist-denoiser');
             this.showStatus('Denoiser saved');
         } catch (error) {
             this.showError('Save failed');
@@ -449,7 +500,7 @@ class MNISTApp {
         try {
             if (this.model) this.model.dispose();
             this.model = await tf.loadLayersModel(tf.io.browserFiles([jsonFile, weightsFile]));
-            this.showStatus('Model loaded');
+            this.showStatus('Classifier loaded');
             this.updateModelInfo();
         } catch (error) {
             this.showError('Load failed');
@@ -496,8 +547,8 @@ class MNISTApp {
     updateDataStatus(trainCount, testCount) {
         document.getElementById('dataStatus').innerHTML = `
             <h3>Data Status</h3>
-            <p>Train: ${trainCount}</p>
-            <p>Test: ${testCount}</p>
+            <p>Train samples: ${trainCount}</p>
+            <p>Test samples: ${testCount}</p>
         `;
     }
 
@@ -512,7 +563,9 @@ class MNISTApp {
 
     showStatus(msg) {
         const logs = document.getElementById('trainingLogs');
-        logs.innerHTML += `<div>[${new Date().toLocaleTimeString()}] ${msg}</div>`;
+        const entry = document.createElement('div');
+        entry.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+        logs.appendChild(entry);
         logs.scrollTop = logs.scrollHeight;
     }
 
@@ -521,10 +574,7 @@ class MNISTApp {
     }
 }
 
-// Запускаем после загрузки страницы
+// Запуск
 document.addEventListener('DOMContentLoaded', () => {
-    // Небольшая задержка для инициализации
-    setTimeout(() => {
-        new MNISTApp();
-    }, 100);
+    new MNISTApp();
 });
