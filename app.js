@@ -141,7 +141,7 @@ async onTrain() {
     await this.modelMax.fit(noisyTrain, trainSubset,{
         epochs:3,
         batchSize:256,
-        validationData:[noisyVal,valXs],
+        validationData:[noisyVal,valSubset],
         callbacks: tfvis.show.fitCallbacks(
             {name:'MaxPool Training'},
             ['loss','val_loss']
@@ -153,7 +153,7 @@ async onTrain() {
     await this.modelAvg.fit(noisyTrain, trainSubset,{
         epochs:3,
         batchSize:256,
-        validationData:[noisyVal,valXs],
+        validationData:[noisyVal,valSubset],
         callbacks: tfvis.show.fitCallbacks(
             {name:'AvgPool Training'},
             ['loss','val_loss']
@@ -245,29 +245,6 @@ async onTestFive(){
         container.appendChild(row);
     }
 
-    for(let i=0;i<5;i++){
-
-        const row = document.createElement("div");
-        row.style.display="flex";
-        row.style.gap="20px";
-
-        const c1=document.createElement("canvas");
-        const c2=document.createElement("canvas");
-        const c3=document.createElement("canvas");
-        const c4=document.createElement("canvas");
-
-        this.dataLoader.draw28x28ToCanvas(tf.tensor(original[i]),c1,4);
-        this.dataLoader.draw28x28ToCanvas(tf.tensor(noisyArr[i]),c2,4);
-        this.dataLoader.draw28x28ToCanvas(tf.tensor(maxArr[i]).squeeze(),c3,4);
-        this.dataLoader.draw28x28ToCanvas(tf.tensor(avgArr[i]).squeeze(),c4,4);
-
-        row.appendChild(c1);
-        row.appendChild(c2);
-        row.appendChild(c3);
-        row.appendChild(c4);
-
-        container.appendChild(row);
-    }
 
     batchXs.dispose();
     noisy.dispose();
