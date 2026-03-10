@@ -131,7 +131,7 @@ async onTrain() {
     const valSubset = valXs.slice([0,0,0,0],[4000,28,28,1]);
 
     const noisyTrain = addNoise(trainSubset);
-    const noisyVal = addNoise(valSubset);
+    const noisyVal = addNoise(valXs);
 
     this.modelMax = this.createAutoencoder("max");
     this.modelAvg = this.createAutoencoder("avg");
@@ -141,7 +141,7 @@ async onTrain() {
     await this.modelMax.fit(noisyTrain, trainSubset,{
         epochs:3,
         batchSize:256,
-        validationData:[noisyVal,valSubset],
+        validationData:[noisyVal,valXs],
         callbacks: tfvis.show.fitCallbacks(
             {name:'MaxPool Training'},
             ['loss','val_loss']
@@ -153,7 +153,7 @@ async onTrain() {
     await this.modelAvg.fit(noisyTrain, trainSubset,{
         epochs:3,
         batchSize:256,
-        validationData:[noisyVal,valSubset],
+        validationData:[noisyVal,valXs],
         callbacks: tfvis.show.fitCallbacks(
             {name:'AvgPool Training'},
             ['loss','val_loss']
