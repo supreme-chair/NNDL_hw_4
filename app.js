@@ -472,15 +472,7 @@ class MNISTApp {
         return div;
     }
 
-    async onSaveDownload() {
-        if (!this.model) return;
-        try {
-            await this.model.save('downloads://mnist-classifier');
-            this.showStatus('Classifier saved');
-        } catch (error) {
-            this.showError('Save failed');
-        }
-    }
+    
 
     async onSaveDenoiser() {
         if (!this.denoiserModel) return;
