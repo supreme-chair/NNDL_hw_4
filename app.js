@@ -32,8 +32,12 @@ class MNISTApp {
         document.getElementById('evaluateBtn').addEventListener('click', () => this.onEvaluate());
         document.getElementById('testFiveBtn').addEventListener('click', () => this.onTestFive());
         document.getElementById('testDenoiseBtn').addEventListener('click', () => this.onTestDenoise());
-        document.getElementById('saveModelBtn').addEventListener('click', () => this.onSaveDownload());
+    
+        // Новые кнопки для сохранения
+        document.getElementById('saveClassifierBtn').addEventListener('click', () => this.onSaveClassifier());
         document.getElementById('saveDenoiserBtn').addEventListener('click', () => this.onSaveDenoiser());
+    
+        // Старые кнопки загрузки
         document.getElementById('loadModelBtn').addEventListener('click', () => this.onLoadFromFiles());
         document.getElementById('loadDenoiserBtn').addEventListener('click', () => this.onLoadDenoiserFromFiles());
         document.getElementById('resetBtn').addEventListener('click', () => this.onReset());
@@ -548,6 +552,34 @@ class MNISTApp {
         }
     }
 
+    async onSaveClassifier() {
+        if (!this.model) {
+            this.showError('No classifier model to save');
+            return;
+        }
+        try {
+            await this.model.save('downloads://mnist-classifier');
+            this.showStatus('Classifier model saved successfully!');
+        } catch (error) {
+            this.showError(`Save failed: ${error.message}`);
+        }
+    }
+
+    async onSaveDenoiser() {
+        if (!this.denoiserModel) {
+            this.showError('No denoiser model to save');
+            return;
+        }
+        try {
+            await this.denoiserModel.save('downloads://mnist-denoiser');
+            this.showStatus('Denoiser model saved successfully!');
+        } catch (error) {
+            this.showError(`Save failed: ${error.message}`);
+        }
+    }
+
+
+    
     updateDataStatus(trainCount, testCount) {
         document.getElementById('dataStatus').innerHTML = `
             <h3>Data Status</h3>
