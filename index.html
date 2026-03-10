@@ -75,20 +75,29 @@
                 <button id="toggleVisorBtn">Toggle Visor</button>
             </div>
 
-            <div class="section">
-                <div class="section-title">Load Models</div>
-                <div style="margin: 10px 0;">
-                    <label>Classifier JSON: <input type="file" id="modelJsonFile" accept=".json"></label>
-                    <label>Classifier Weights: <input type="file" id="modelWeightsFile" accept=".bin"></label>
-                    <button id="loadModelBtn">Load Classifier</button>
+           <div class="section">
+                <div class="section-title">Save/Load Models</div>
+    
+                <div style="margin: 10px 0; padding: 10px; background: #e8f5e9; border-radius: 4px;">
+                    <h4>Classifier</h4>
+                    <button id="saveClassifierBtn" class="success" style="background: #4CAF50;">💾 Save Classifier</button>
+                    <button id="loadModelBtn" class="secondary" style="background: #2196F3;">📂 Load Classifier</button>
+                    <div style="margin-top: 5px;">
+                        <label>JSON: <input type="file" id="modelJsonFile" accept=".json"></label>
+                        <label>Weights: <input type="file" id="modelWeightsFile" accept=".bin"></label>
+                    </div>
                 </div>
-                <div style="margin: 10px 0;">
-                    <label>Denoiser JSON: <input type="file" id="denoiserJsonFile" accept=".json"></label>
-                    <label>Denoiser Weights: <input type="file" id="denoiserWeightsFile" accept=".bin"></label>
-                    <button id="loadDenoiserBtn" class="secondary">Load Denoiser</button>
-                </div>
-            </div>
 
+                <div style="margin: 10px 0; padding: 10px; background: #fff3e0; border-radius: 4px;">
+                    <h4>Denoiser</h4>
+                    <button id="saveDenoiserBtn" class="success" style="background: #FF9800;">💾 Save Denoiser</button>
+                    <button id="loadDenoiserBtn" class="secondary" style="background: #2196F3;">📂 Load Denoiser</button>
+                    <div style="margin-top: 5px;">
+                        <label>JSON: <input type="file" id="denoiserJsonFile" accept=".json"></label>
+                        <label>Weights: <input type="file" id="denoiserWeightsFile" accept=".bin"></label>
+                    </div>
+                </div>
+            </div
             <div id="dataStatus" class="status">
                 <h3>Data Status</h3>
                 <p>No data loaded</p>
