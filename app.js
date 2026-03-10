@@ -143,6 +143,7 @@ async onTrain() {
         epochs:3,
         batchSize:128,
         validationData:[noisyVal,valSubset],
+        yieldEvery: 'epoch',
         callbacks: tfvis.show.fitCallbacks(
             {name:'MaxPool Training'},
             ['loss','val_loss'],
