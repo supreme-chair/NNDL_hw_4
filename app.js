@@ -361,8 +361,8 @@ return tf.tidy(()=>{
 
 }
 
-document.addEventListener("DOMContentLoaded", async ()=>{
-    await tf.setBackend('cpu')
+document.addEventListener("DOMContentLoaded", ()=>{
+    tf.setBackend('cpu')
     new MNISTApp();
 
 });
