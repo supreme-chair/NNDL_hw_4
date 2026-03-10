@@ -145,7 +145,8 @@ async onTrain() {
         validationData:[noisyVal,valSubset],
         callbacks: tfvis.show.fitCallbacks(
             {name:'MaxPool Training'},
-            ['loss','val_loss']
+            ['loss','val_loss'],
+            {callbacks:['onEpochEnd']}
         )
     });
     await tf.nextFrame();
@@ -158,7 +159,8 @@ async onTrain() {
         validationData:[noisyVal,valSubset],
         callbacks: tfvis.show.fitCallbacks(
             {name:'AvgPool Training'},
-            ['loss','val_loss']
+            ['loss','val_loss'],
+            {callbacks:['onEpochEnd']}
         )
     });
 
