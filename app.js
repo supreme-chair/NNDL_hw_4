@@ -36,9 +36,7 @@ showStatus(msg){
 }
 
 showError(msg){
-
     this.showStatus("ERROR: "+msg)
-
 }
 
 async onLoadData(){
@@ -58,7 +56,6 @@ async onLoadData(){
     this.testData=await this.dataLoader.loadTestFromFiles(testFile)
 
     this.showStatus("Data loaded")
-
 }
 
 createAutoencoder(poolType){
@@ -66,7 +63,7 @@ createAutoencoder(poolType){
     const input=tf.input({shape:[28,28,1]})
 
     let x=tf.layers.conv2d({
-        filters:16,
+        filters:32,
         kernelSize:3,
         activation:'relu',
         padding:'same'
@@ -78,13 +75,20 @@ createAutoencoder(poolType){
         x=tf.layers.averagePooling2d({poolSize:[2,2]}).apply(x)
 
     x=tf.layers.conv2d({
-        filters:8,
+        filters:16,
         kernelSize:3,
         activation:'relu',
         padding:'same'
     }).apply(x)
 
     x=tf.layers.upSampling2d({size:[2,2]}).apply(x)
+
+    x=tf.layers.conv2d({
+        filters:32,
+        kernelSize:3,
+        activation:'relu',
+        padding:'same'
+    }).apply(x)
 
     const output=tf.layers.conv2d({
         filters:1,
@@ -97,7 +101,7 @@ createAutoencoder(poolType){
 
     model.compile({
         optimizer:'adam',
-        loss:'binaryCrossentropy'
+        loss:'meanSquaredError'
     })
 
     return model
@@ -130,7 +134,7 @@ async onTrain(){
     this.showStatus("Training MAX model")
 
     await this.modelMax.fit(noisyTrain,trainSubset,{
-        epochs:5,
+        epochs:6,
         batchSize:64,
         validationData:[noisyVal,valSubset]
     })
@@ -138,7 +142,7 @@ async onTrain(){
     this.showStatus("Training AVG model")
 
     await this.modelAvg.fit(noisyTrain,trainSubset,{
-        epochs:5,
+        epochs:6,
         batchSize:64,
         validationData:[noisyVal,valSubset]
     })
@@ -151,7 +155,6 @@ async onTrain(){
     noisyVal.dispose()
 
     this.showStatus("Training complete")
-
 }
 
 async onEvaluate(){
@@ -173,7 +176,6 @@ async onEvaluate(){
     this.showStatus(`AVG loss: ${valAvg.toFixed(5)}`)
 
     noisy.dispose()
-
 }
 
 async onTestFive(){
@@ -235,7 +237,6 @@ async onTestFive(){
     noisy.dispose()
     maxPred.dispose()
     avgPred.dispose()
-
 }
 
 async onSaveDownload(){
@@ -249,7 +250,6 @@ async onSaveDownload(){
     await this.modelAvg.save('downloads://mnist-denoiser-avg')
 
     this.showStatus("Models saved")
-
 }
 
 onReset(){
@@ -267,12 +267,11 @@ onReset(){
     document.getElementById("previewContainer").innerHTML=""
 
     this.showStatus("Reset done")
-
 }
 
 }
 
-function addNoise(images,noiseFactor=0.3){
+function addNoise(images,noiseFactor=0.15){
 
 return tf.tidy(()=>{
 
@@ -287,7 +286,5 @@ return tf.tidy(()=>{
 }
 
 document.addEventListener("DOMContentLoaded",()=>{
-
     new MNISTApp()
-
 })
