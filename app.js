@@ -20,6 +20,7 @@ initializeUI(){
     document.getElementById('testFiveBtn').addEventListener('click',()=>this.onTestFive())
     document.getElementById('saveModelBtn').addEventListener('click',()=>this.onSaveDownload())
     document.getElementById('resetBtn').addEventListener('click',()=>this.onReset())
+
 }
 
 showStatus(msg){
