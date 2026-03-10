@@ -1,6 +1,7 @@
 class MNISTApp {
 
 constructor(){
+
     this.dataLoader = new MNISTDataLoader()
 
     this.modelMax = null
@@ -21,6 +22,8 @@ initializeUI(){
     document.getElementById('saveModelBtn').addEventListener('click',()=>this.onSaveDownload())
     document.getElementById('resetBtn').addEventListener('click',()=>this.onReset())
 
+    document.getElementById('toggleVisorBtn')
+    .addEventListener('click',()=>tfvis.visor().toggle())
 }
 
 showStatus(msg){
@@ -32,11 +35,36 @@ showStatus(msg){
     entry.textContent=`[${new Date().toLocaleTimeString()}] ${msg}`
 
     logs.appendChild(entry)
-
 }
 
 showError(msg){
     this.showStatus("ERROR: "+msg)
+}
+
+updateDataStatus(trainCount,testCount){
+
+    const el=document.getElementById("dataStatus")
+
+    el.innerHTML=`
+    <h3>Data Status</h3>
+    <p>Train samples: ${trainCount}</p>
+    <p>Test samples: ${testCount}</p>
+    `
+}
+
+updateModelInfo(){
+
+    const el=document.getElementById("modelInfo")
+
+    if(!this.modelMax){
+        el.innerHTML="<h3>Model Info</h3><p>No model loaded</p>"
+        return
+    }
+
+    el.innerHTML=`
+    <h3>Model Info</h3>
+    <p>Autoencoder models trained</p>
+    `
 }
 
 async onLoadData(){
@@ -54,6 +82,8 @@ async onLoadData(){
 
     this.showStatus("Loading test data...")
     this.testData=await this.dataLoader.loadTestFromFiles(testFile)
+
+    this.updateDataStatus(this.trainData.count,this.testData.count)
 
     this.showStatus("Data loaded")
 }
@@ -154,33 +184,38 @@ async onTrain(){
     noisyTrain.dispose()
     noisyVal.dispose()
 
+    this.updateModelInfo()
+
     this.showStatus("Training complete")
 }
 
 async onEvaluate(){
 
-    if(!this.modelMax || !this.modelAvg){
+    if(!this.modelMax || !this.modelAvg || !this.testData){
         this.showError("Train model first")
         return
     }
 
-    const noisy=addNoise(this.testData.xs)
+    const testSubset=this.testData.xs.slice([0,0,0,0],[1000,28,28,1])
 
-    const lossMax=this.modelMax.evaluate(noisy,this.testData.xs)
-    const lossAvg=this.modelAvg.evaluate(noisy,this.testData.xs)
+    const noisy=addNoise(testSubset)
 
-    const valMax=(await lossMax.data())[0]
-    const valAvg=(await lossAvg.data())[0]
+    const lossMaxTensor=this.modelMax.evaluate(noisy,testSubset)
+    const lossAvgTensor=this.modelAvg.evaluate(noisy,testSubset)
+
+    const valMax=(await lossMaxTensor.data())[0]
+    const valAvg=(await lossAvgTensor.data())[0]
 
     this.showStatus(`MAX loss: ${valMax.toFixed(5)}`)
     this.showStatus(`AVG loss: ${valAvg.toFixed(5)}`)
 
     noisy.dispose()
+    testSubset.dispose()
 }
 
 async onTestFive(){
 
-    if(!this.modelMax || !this.modelAvg){
+    if(!this.modelMax || !this.modelAvg || !this.testData){
         this.showError("Train model first")
         return
     }
@@ -205,32 +240,25 @@ async onTestFive(){
         row.style.display="flex"
         row.style.gap="20px"
 
-        const c1=document.createElement("canvas")
-        const c2=document.createElement("canvas")
-        const c3=document.createElement("canvas")
-        const c4=document.createElement("canvas")
+        const canvases=[document.createElement("canvas"),
+                        document.createElement("canvas"),
+                        document.createElement("canvas"),
+                        document.createElement("canvas")]
 
-        const orig=batchXs.slice([i,0,0,0],[1,28,28,1]).squeeze()
-        const noisyImg=noisy.slice([i,0,0,0],[1,28,28,1]).squeeze()
-        const maxImg=maxPred.slice([i,0,0,0],[1,28,28,1]).squeeze()
-        const avgImg=avgPred.slice([i,0,0,0],[1,28,28,1]).squeeze()
+        const tensors=[
+            batchXs.slice([i,0,0,0],[1,28,28,1]).squeeze(),
+            noisy.slice([i,0,0,0],[1,28,28,1]).squeeze(),
+            maxPred.slice([i,0,0,0],[1,28,28,1]).squeeze(),
+            avgPred.slice([i,0,0,0],[1,28,28,1]).squeeze()
+        ]
 
-        this.dataLoader.draw28x28ToCanvas(orig,c1,4)
-        this.dataLoader.draw28x28ToCanvas(noisyImg,c2,4)
-        this.dataLoader.draw28x28ToCanvas(maxImg,c3,4)
-        this.dataLoader.draw28x28ToCanvas(avgImg,c4,4)
-
-        row.appendChild(c1)
-        row.appendChild(c2)
-        row.appendChild(c3)
-        row.appendChild(c4)
+        for(let j=0;j<4;j++){
+            this.dataLoader.draw28x28ToCanvas(tensors[j],canvases[j],4)
+            row.appendChild(canvases[j])
+            tensors[j].dispose()
+        }
 
         container.appendChild(row)
-
-        orig.dispose()
-        noisyImg.dispose()
-        maxImg.dispose()
-        avgImg.dispose()
     }
 
     batchXs.dispose()
@@ -266,12 +294,14 @@ onReset(){
 
     document.getElementById("previewContainer").innerHTML=""
 
+    this.updateModelInfo()
+
     this.showStatus("Reset done")
 }
 
 }
 
-function addNoise(images,noiseFactor=0.15){
+function addNoise(images,noiseFactor=0.1){
 
 return tf.tidy(()=>{
 
@@ -282,7 +312,6 @@ return tf.tidy(()=>{
     return noisy.clipByValue(0,1)
 
 })
-
 }
 
 document.addEventListener("DOMContentLoaded",()=>{
