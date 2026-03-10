@@ -148,6 +148,7 @@ async onTrain() {
             ['loss','val_loss']
         )
     });
+    await tf.nextFrame();
 
     this.showStatus("Training AVG pooling model...");
 
