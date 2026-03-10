@@ -102,7 +102,7 @@ createAutoencoder(poolType) {
     const model = tf.model({inputs:input, outputs:output});
 
     model.compile({
-        optimizer:'adam',
+        optimizer: tf.train.adam(0.0005),
         loss:'meanSquaredError'
     });
 
@@ -127,18 +127,20 @@ async onTrain() {
         this.trainData.ys,
         0.1
     );
+    const trainSubset = trainXs.slice([0,0,0,0],[20000,28,28,1]);
+    const valSubset = valXs.slice([0,0,0,0],[4000,28,28,1]);
 
-    const noisyTrain = addNoise(trainXs);
-    const noisyVal = addNoise(valXs);
+    const noisyTrain = addNoise(trainSubset);
+    const noisyVal = addNoise(valSubset);
 
     this.modelMax = this.createAutoencoder("max");
     this.modelAvg = this.createAutoencoder("avg");
 
     this.showStatus("Training MAX pooling model...");
 
-    await this.modelMax.fit(noisyTrain, trainXs,{
-        epochs:2,
-        batchSize:128,
+    await this.modelMax.fit(noisyTrain, trainSubset,{
+        epochs:3,
+        batchSize:256,
         validationData:[noisyVal,valXs],
         callbacks: tfvis.show.fitCallbacks(
             {name:'MaxPool Training'},
@@ -148,9 +150,9 @@ async onTrain() {
 
     this.showStatus("Training AVG pooling model...");
 
-    await this.modelAvg.fit(noisyTrain, trainXs,{
-        epochs:5,
-        batchSize:128,
+    await this.modelAvg.fit(noisyTrain, trainSubset,{
+        epochs:3,
+        batchSize:256,
         validationData:[noisyVal,valXs],
         callbacks: tfvis.show.fitCallbacks(
             {name:'AvgPool Training'},
@@ -179,8 +181,8 @@ async onEvaluate() {
 
     const noisy = addNoise(this.testData.xs);
 
-    const lossMax = await this.modelMax.evaluate(noisy,this.testData.xs);
-    const lossAvg = await this.modelAvg.evaluate(noisy,this.testData.xs);
+    const lossMax = this.modelMax.evaluate(noisy,this.testData.xs);
+    const lossAvg = this.modelAvg.evaluate(noisy,this.testData.xs);
 
     const valMax = (await lossMax.data())[0];
     const valAvg = (await lossAvg.data())[0];
@@ -188,6 +190,8 @@ async onEvaluate() {
     this.showStatus(`Reconstruction Loss MAX: ${valMax.toFixed(5)}`);
     this.showStatus(`Reconstruction Loss AVG: ${valAvg.toFixed(5)}`);
 
+    lossMax.dispose();
+    lossAvg.dispose();
     noisy.dispose();
 }
 
@@ -212,10 +216,34 @@ async onTestFive(){
     const denoiseMax = this.modelMax.predict(noisy);
     const denoiseAvg = this.modelAvg.predict(noisy);
 
-    const original = batchXs.arraySync();
-    const noisyArr = noisy.arraySync();
-    const maxArr = denoiseMax.arraySync();
-    const avgArr = denoiseAvg.arraySync();
+    for(let i=0;i<5;i++){
+
+        const row=document.createElement("div");
+        row.style.display="flex";
+        row.style.gap="20px";
+
+        const c1=document.createElement("canvas");
+        const c2=document.createElement("canvas");
+        const c3=document.createElement("canvas");
+        const c4=document.createElement("canvas");
+
+        const orig = batchXs.slice([i,0,0,0],[1,28,28,1]).squeeze();
+        const noisyImg = noisy.slice([i,0,0,0],[1,28,28,1]).squeeze();
+        const maxImg = denoiseMax.slice([i,0,0,0],[1,28,28,1]).squeeze();
+        const avgImg = denoiseAvg.slice([i,0,0,0],[1,28,28,1]).squeeze();
+
+        this.dataLoader.draw28x28ToCanvas(orig,c1,4);
+        this.dataLoader.draw28x28ToCanvas(noisyImg,c2,4);
+        this.dataLoader.draw28x28ToCanvas(maxImg,c3,4);
+        this.dataLoader.draw28x28ToCanvas(avgImg,c4,4);
+
+        row.appendChild(c1);
+        row.appendChild(c2);
+        row.appendChild(c3);
+        row.appendChild(c4);
+
+        container.appendChild(row);
+    }
 
     for(let i=0;i<5;i++){
 
@@ -343,7 +371,7 @@ showError(msg){
 function addNoise(images, noiseFactor=0.2){
 
 return tf.tidy(()=>{
-    const noise=tf.randomNormal(images.shape);
+    const noise=tf.randomNormal(images.shape,0,1);
     const noisy=images.add(noise.mul(noiseFactor));
     return noisy.clipByValue(0,1);
 });
