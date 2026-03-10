@@ -13,15 +13,11 @@ async onTrain() {
         this.isTraining = true;
         this.showStatus('Starting training...');
         
-        // Используем подмножество данных для скорости
-        const numSamples = Math.min(5000, this.trainData.xs.shape[0]); // Увеличил до 5000
+        const numSamples = Math.min(5000, this.trainData.xs.shape[0]);
         
-        // В data-loader.js данные УЖЕ нормализованы делением на 255
-        // Поэтому НЕ ДЕЛИМ ещё раз!
         const xs = this.trainData.xs.slice([0, 0, 0, 0], [numSamples, 28, 28, 1]);
         const ys = this.trainData.ys.slice([0, 0], [numSamples, 10]);
         
-        // Проверим диапазон данных
         const min = await xs.min().data();
         const max = await xs.max().data();
         this.showStatus(`Data range: [${min[0].toFixed(3)}, ${max[0].toFixed(3)}]`);
@@ -41,10 +37,9 @@ async onTrain() {
 
         const startTime = Date.now();
         
-        // Обучаем с меньшим learning rate для стабильности
         await this.model.fit(trainXs, trainYs, {
             epochs: 5,
-            batchSize: 128, // Увеличил batch size
+            batchSize: 128,
             validationData: [valXs, valYs],
             callbacks: {
                 onEpochEnd: (epoch, logs) => {
@@ -66,79 +61,6 @@ async onTrain() {
     }
 }
 
-createClassifier() {
-    const model = tf.sequential();
-    
-    // Простая, но эффективная архитектура
-    model.add(tf.layers.conv2d({
-        filters: 32,
-        kernelSize: 3,
-        activation: 'relu',
-        inputShape: [28, 28, 1],
-        kernelInitializer: 'heNormal'
-    }));
-    
-    model.add(tf.layers.maxPooling2d({ poolSize: 2 }));
-    
-    model.add(tf.layers.conv2d({
-        filters: 64,
-        kernelSize: 3,
-        activation: 'relu',
-        kernelInitializer: 'heNormal'
-    }));
-    
-    model.add(tf.layers.maxPooling2d({ poolSize: 2 }));
-    model.add(tf.layers.flatten());
-    
-    model.add(tf.layers.dense({
-        units: 128,
-        activation: 'relu',
-        kernelInitializer: 'heNormal'
-    }));
-    
-    model.add(tf.layers.dropout({ rate: 0.3 }));
-    
-    model.add(tf.layers.dense({
-        units: 10,
-        activation: 'softmax'
-    }));
-    
-    model.compile({
-        optimizer: tf.train.adam(0.0005), // Уменьшенный learning rate
-        loss: 'categoricalCrossentropy',
-        metrics: ['accuracy']
-    });
-    
-    return model;
-}
-
-async onEvaluate() {
-    if (!this.model || !this.testData) {
-        this.showError('Please train a classifier first');
-        return;
-    }
-
-    try {
-        this.showStatus('Evaluating...');
-        
-        const numTest = Math.min(2000, this.testData.xs.shape[0]);
-        
-        // НЕ делим на 255, данные уже нормализованы
-        const testXs = this.testData.xs.slice([0, 0, 0, 0], [numTest, 28, 28, 1]);
-        const testYs = this.testData.ys.slice([0, 0], [numTest, 10]);
-        
-        const result = this.model.evaluate(testXs, testYs, { batchSize: 128 });
-        const acc = result[1].dataSync()[0];
-        
-        this.showStatus(`Test accuracy: ${(acc * 100).toFixed(2)}%`);
-        
-        tf.dispose([testXs, testYs, result[0], result[1]]);
-        
-    } catch (error) {
-        this.showError(`Evaluation failed: ${error.message}`);
-    }
-}
-
 async onTrainDenoiser() {
     if (!this.trainData) {
         this.showError('Please load training data first');
@@ -154,19 +76,15 @@ async onTrainDenoiser() {
         this.isTraining = true;
         this.showStatus('Starting denoiser training...');
         
-        // Используем подмножество
         const numSamples = Math.min(1000, this.trainData.xs.shape[0]);
         
-        // Данные уже нормализованы в data-loader.js
         const cleanImages = this.trainData.xs.slice([0, 0, 0, 0], [numSamples, 28, 28, 1]);
         
-        // Создаем зашумленные версии
         const noise = tf.randomNormal([numSamples, 28, 28, 1], 0, 0.2);
         const noisyImages = tf.tidy(() => {
             return cleanImages.add(noise).clipByValue(0, 1);
         });
         
-        // Преобразуем в плоские векторы для dense слоев
         const cleanFlat = cleanImages.reshape([numSamples, 784]);
         const noisyFlat = noisyImages.reshape([numSamples, 784]);
         
