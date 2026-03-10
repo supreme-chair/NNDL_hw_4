@@ -130,7 +130,7 @@ async onTrain() {
     const trainSubset = trainXs.slice([0,0,0,0],[20000,28,28,1]);
 
     const noisyTrain = addNoise(trainSubset);
-    const noisyVal = addNoise(valXs);
+    const noisyVal = addNoise(valXs.slice([0,0,0,0],[4000,28,28,1]));
 
     this.modelMax = this.createAutoencoder("max");
     this.modelAvg = this.createAutoencoder("avg");
@@ -349,7 +349,7 @@ showError(msg){
 
 }
 
-function addNoise(images, noiseFactor=0.2){
+function addNoise(images, noiseFactor=0.05){
 
 return tf.tidy(()=>{
     const noise=tf.randomNormal(images.shape,0,1);
