@@ -476,7 +476,7 @@ class MNISTApp {
         const maxPoolModel = this.createDenoiserWithPooling('max');
         // Обучаем её на маленькой выборке для демонстрации
         const trainIndices = [];
-        for (let i = 0; i < 100; i++) {
+        for (let i = 0; i < 500; i++) {
             trainIndices.push(Math.floor(Math.random() * this.trainData.xs.shape[0]));
         }
         const trainOriginal = tf.gather(this.trainData.xs, trainIndices);
@@ -484,8 +484,8 @@ class MNISTApp {
         const trainNoisy = trainOriginal.add(trainNoise).clipByValue(0, 1);
         
         await maxPoolModel.fit(trainNoisy.reshape([100, 784]), trainOriginal.reshape([100, 784]), {
-            epochs: 5,
-            batchSize: 32,
+            epochs: 20,
+            batchSize: 16,
             verbose: 0
         });
         
