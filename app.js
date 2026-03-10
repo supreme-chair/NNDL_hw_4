@@ -128,7 +128,6 @@ async onTrain() {
         0.1
     );
     const trainSubset = trainXs.slice([0,0,0,0],[20000,28,28,1]);
-    const valSubset = valXs.slice([0,0,0,0],[4000,28,28,1]);
 
     const noisyTrain = addNoise(trainSubset);
     const noisyVal = addNoise(valXs);
@@ -236,6 +235,11 @@ async onTestFive(){
         this.dataLoader.draw28x28ToCanvas(noisyImg,c2,4);
         this.dataLoader.draw28x28ToCanvas(maxImg,c3,4);
         this.dataLoader.draw28x28ToCanvas(avgImg,c4,4);
+
+        orig.dispose();
+        noisyImg.dispose();
+        maxImg.dispose();
+        avgImg.dispose();
 
         row.appendChild(c1);
         row.appendChild(c2);
